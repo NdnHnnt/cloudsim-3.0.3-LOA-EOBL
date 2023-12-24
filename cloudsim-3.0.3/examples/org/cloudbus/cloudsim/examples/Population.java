@@ -1,8 +1,10 @@
 package org.cloudbus.cloudsim.examples;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Random;
+import java.util.List;
 
 /**
  * A population is an abstraction of a collection of individuals. The population
@@ -16,48 +18,55 @@ import java.util.Random;
 public class Population {
 	public Individual population[];
 	public double populationFitness = -1;
+	private List<Individual> lions;
+	private Individual lowestFitnessLion;
 
 	/**
 	 * Initializes blank population of individuals
 	 * 
 	 * @param populationSize
-	 *            The number of individuals in the population
+	 *                       The number of individuals in the population
 	 */
 	public Population(int populationSize) {
 		// Initial population
 		this.population = new Individual[populationSize];
+		
 	}
 
 	/**
 	 * Initializes population of individuals
 	 * 
 	 * @param populationSize
-	 *            The number of individuals in the population
+	 *                         The number of individuals in the population
 	 * @param chromosomeLength
-	 *            The size of each individual's chromosome
+	 *                         The size of each individual's chromosome
 	 */
 	public Population(int populationSize, int chromosomeLength, int dataCenterIterator) {
 		// Initialize the population as an array of individuals
 		this.population = new Individual[populationSize];
+		this.lions = new ArrayList<>();
+		this.lowestFitnessLion = null;
 
 		// Create each individual in turn
 		for (int individualCount = 0; individualCount < populationSize; individualCount++) {
 			// Create an individual, initializing its chromosome to the given length
 			Individual individual = new Individual(chromosomeLength, dataCenterIterator);
+			// Add individuals to lions arraylist
+			lions.add(individual);
 			// Add individual to population
 			this.population[individualCount] = individual;
 		}
 		/*
-		Uncomment to Print Population
-		System.out.println("Population");
-		for(int i=0;i<populationSize;i++) {
-			System.out.print("Indi "+i+" -> ");
-			for(int j=0;j<5;j++) {
-				System.out.print(population[i].chromosome[j] + " ");
-			}
-			System.out.println();
-		}
-		*/
+		 * Uncomment to Print Population
+		 * System.out.println("Population");
+		 * for(int i=0;i<populationSize;i++) {
+		 * System.out.print("Indi "+i+" -> ");
+		 * for(int j=0;j<5;j++) {
+		 * System.out.print(population[i].chromosome[j] + " ");
+		 * }
+		 * System.out.println();
+		 * }
+		 */
 	}
 
 	/**
@@ -79,8 +88,8 @@ public class Population {
 	 * individuals (if you're using "elitism").
 	 * 
 	 * @param offset
-	 *            The offset of the individual you want, sorted by fitness. 0 is
-	 *            the strongest, population.length - 1 is the weakest.
+	 *               The offset of the individual you want, sorted by fitness. 0 is
+	 *               the strongest, population.length - 1 is the weakest.
 	 * @return individual Individual at offset
 	 */
 	public Individual getFittest(int offset) {
@@ -105,7 +114,7 @@ public class Population {
 	 * Set population's group fitness
 	 * 
 	 * @param fitness
-	 *            The population's total fitness
+	 *                The population's total fitness
 	 */
 	public void setPopulationFitness(double fitness) {
 		this.populationFitness = fitness;
@@ -117,7 +126,7 @@ public class Population {
 	 * @return populationFitness The population's total fitness
 	 */
 	public double getPopulationFitness() {
-		return this.populationFitness;
+		return Math.abs(this.populationFitness);
 	}
 
 	/**
@@ -149,7 +158,7 @@ public class Population {
 	public Individual getIndividual(int offset) {
 		return population[offset];
 	}
-	
+
 	/**
 	 * Shuffles the population in-place
 	 * 
@@ -164,5 +173,46 @@ public class Population {
 			population[index] = population[i];
 			population[i] = a;
 		}
+	}
+
+	public List<Individual> getNomads() {
+		List<Individual> nomads = new ArrayList<>();
+		for (Individual lion : this.lions) {
+			if (lion.getPrideId() == 0) {
+				nomads.add(lion);
+			}
+		}
+		return nomads;
+	}
+
+	public List<Individual> getPrideLions(int prideId) {
+		List<Individual> prideLions = new ArrayList<>();
+		for (Individual lion : this.lions) {
+			if (lion.getPrideId() == prideId) {
+				prideLions.add(lion);
+			}
+		}
+		return prideLions;
+	}
+
+	public Individual getPrideMaleLion(int prideId) {
+		for (Individual lion : this.lions) {
+			if (lion.getPrideId() == prideId && lion.getIsMale()) {
+				return lion;
+			}
+		}
+		// Return null if no male lion is found in the specified pride
+		return null;
+	}
+
+	public Individual getLowestFitnessPrideMaleLion(int prideId) {
+		for (Individual lion : this.lions) {
+			if (lion.getPrideId() == prideId && lion.getIsMale()) {
+				if (this.lowestFitnessLion == null || lion.getFitness() < this.lowestFitnessLion.getFitness()) {
+					this.lowestFitnessLion = lion;
+				}
+			}
+		}
+		return lowestFitnessLion;
 	}
 }

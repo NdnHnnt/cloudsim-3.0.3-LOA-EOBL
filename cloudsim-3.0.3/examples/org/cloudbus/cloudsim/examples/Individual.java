@@ -1,5 +1,6 @@
 package org.cloudbus.cloudsim.examples;
 
+import java.util.Arrays;
 import java.util.Random;
 
 // chromosome = vmPositions
@@ -24,7 +25,7 @@ public class Individual {
 
         Random random = new Random();
         for (int gene = 0; gene < cloudletLength; gene++) {
-            int rand = random.nextInt(range) + min;
+            int rand = Math.abs(random.nextInt(range) + min);
             setGene(gene, rand);
         }
     }
@@ -83,5 +84,15 @@ public class Individual {
             output.append(this.vmPositions[gene]);
         }
         return output.toString();
+    }
+
+    public void setPosition(int index, int newPosition) {
+        if (index >= 0 && index < vmPositions.length) {
+            vmPositions[index] = newPosition;
+        }
+    }
+
+    public void setVmPositions(int[] newPositions) {
+        this.vmPositions = Arrays.copyOf(newPositions, newPositions.length);
     }
 }
