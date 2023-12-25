@@ -195,6 +195,16 @@ public class Population {
 		return prideLions;
 	}
 
+	public List<Individual> getPrideFemaleLions(int prideId) {
+		List<Individual> prideFemaleLions = new ArrayList<>();
+		for (Individual lion : this.lions) {
+			if (lion.getPrideId() == prideId && !lion.getIsMale()) {
+				prideFemaleLions.add(lion);
+			}
+		}
+		return prideFemaleLions;
+	}
+
 	public Individual getPrideMaleLion(int prideId) {
 		for (Individual lion : this.lions) {
 			if (lion.getPrideId() == prideId && lion.getIsMale()) {

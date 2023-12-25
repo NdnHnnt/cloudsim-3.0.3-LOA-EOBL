@@ -7,7 +7,6 @@ import java.util.Random;
 // chromosomeLength = cloudletLength
 public class Individual {
     private int[] vmPositions;
-    private int[] vmBestPositionsList;
     private double fitness = -1;
     private boolean isMale;
     private int prideId;
@@ -68,14 +67,6 @@ public class Individual {
 
     public int getPrideId() {
         return this.prideId;
-    }
-
-    public void setVmBestPositionsList(int[] vmBestPositionsList) {
-        this.vmBestPositionsList = vmBestPositionsList;
-    }
-
-    public int[] getVmBestPositionsList() {
-        return this.vmBestPositionsList;
     }
 
     public String toString() {
