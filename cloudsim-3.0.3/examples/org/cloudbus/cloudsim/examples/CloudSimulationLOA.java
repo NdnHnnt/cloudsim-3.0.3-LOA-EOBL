@@ -182,15 +182,14 @@ public class CloudSimulationLOA {
 			broker.submitVmList(vmlist);
 			broker.submitCloudletList(cloudletList);
 
-			int cloudletLoopingNumber = cloudletNumber / vmNumber - 1; // number of iteration needed to process the
-																		// dataset
+			int cloudletLoopingNumber = cloudletNumber / vmNumber - 1; // number of iteration needed to process the dataset
 
 			for (int cloudletIterator = 0; cloudletIterator <= cloudletLoopingNumber; cloudletIterator++) {
 				System.out.println("Cloudlet Iteration Number " + cloudletIterator);
 
 				for (int dataCenterIterator = 1; dataCenterIterator <= 6; dataCenterIterator++) {
 					// G) Initialize Lion Optimization Algorithm
-					LionOptimizationAlgorithm loa = new LionOptimizationAlgorithm(75, 0, cloudletList, vmlist);
+					LionOptimizationAlgorithm loa = new LionOptimizationAlgorithm(75, cloudletList, vmlist);
 
 					// H) Initialize population
 					System.out.println("Datacenter " + dataCenterIterator + " Population Initialization");

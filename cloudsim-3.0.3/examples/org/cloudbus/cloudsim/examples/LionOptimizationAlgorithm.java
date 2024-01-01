@@ -18,13 +18,6 @@ public class LionOptimizationAlgorithm {
     private int populationSize;
     private List<Cloudlet> cloudletList;
     private List<Vm> vmList;
-    private List<Integer> vmPositions;
-    private List<Integer> vmBestPositions;
-    private List<Integer> cloudletAllocation;
-    private List<Integer> bestCloudletAllocation;
-    private double localBestFitness;
-    private double globalBestFitness;
-    private double mutationRate;
     private double nomadPercentage;
     private double maleNomadPercentage;
     private double malePridePercentage;
@@ -33,15 +26,11 @@ public class LionOptimizationAlgorithm {
     private double femaleImmigrateRate;
     private Map<Integer, List<Individual>> huntersByPride;
 
-    public LionOptimizationAlgorithm(int populationSize, double mutationRate, List<Cloudlet> cloudletList,
-            List<Vm> vmList) {
+    public LionOptimizationAlgorithm(int populationSize, List<Cloudlet> cloudletList,List<Vm> vmList) {
         this.huntersByPride = new HashMap<>();
         this.populationSize = populationSize;
-        this.mutationRate = mutationRate;
         this.cloudletList = cloudletList;
         this.vmList = vmList;
-        this.localBestFitness = 0;
-        this.globalBestFitness = 0;
         // The parameters below are based on the reference paper
         this.prideNumber = 4;
         this.roamingPercentage = 0.2;
@@ -322,7 +311,6 @@ public class LionOptimizationAlgorithm {
     // 2.2) Pride Roam
     public void prideRoam(Population population, int dataCenterIterator, int cloudletIteration) {
         Random rand = new Random();
-        // double pr = this.roamingPercentage;
     
         for (Individual lion : population.getIndividuals()) {
             // 2.2.1) Check if the lion is a nomad
@@ -332,17 +320,12 @@ public class LionOptimizationAlgorithm {
                     int[] oldPositions = lion.getVmPositions();
                     int[] newPositions = new int[oldPositions.length];
     
-                    // int minGene = (dataCenterIterator - 1) * 9;
-                    // int maxGene = ((dataCenterIterator + 1) * 9) - 1;
                     int minGene = (dataCenterIterator - 1) * 9;
                     int maxGene = ((dataCenterIterator) * 9) - 1;
     
                     for (int i = 0; i < oldPositions.length; i++) {
                         // 2.2.3) Replace with your own logic for generating a random position
                         newPositions[i] = rand.nextInt(maxGene - minGene) + minGene;
-    
-                        // 2.2.4) Ensure the new position is within the range of minGene and maxGene
-                        // newPositions[i] = Math.max(minGene, Math.min(maxGene, newPositions[i]));
                     }
     
                     double oldFitness = lion.getFitness();
@@ -394,8 +377,6 @@ public class LionOptimizationAlgorithm {
                 }
 
                 Random rand = new Random();
-                int numMate = rand.nextInt(females.length + 1);
-
                 if (rand.nextDouble() <= this.matingPercentage) { 
                     // 2.3.6) Select one male and one female for mating
                     Individual parent1 = males[new Random().nextInt(males.length)];
@@ -441,17 +422,12 @@ public class LionOptimizationAlgorithm {
                     int[] oldPositions = lion.getVmPositions();
                     int[] newPositions = new int[oldPositions.length];
     
-                    // int minGene = (dataCenterIterator - 1) * 9;
-                    // int maxGene = ((dataCenterIterator + 1) * 9) - 1;
                     int minGene = (dataCenterIterator - 1) * 9;
                     int maxGene = ((dataCenterIterator) * 9) - 1;
     
                     for (int i = 0; i < oldPositions.length; i++) {
                         // 2.4.3) Replace with your own logic for generating a random position
                         newPositions[i] = rand.nextInt(maxGene - minGene) + minGene;
-    
-                        // Ensure the new position is within the range of minGene and maxGene
-                        // newPositions[i] = Math.max(minGene, Math.min(maxGene, newPositions[i]));
                     }
     
                     double oldFitness = lion.getFitness();
@@ -572,6 +548,11 @@ public class LionOptimizationAlgorithm {
                 .collect(Collectors.toList());
 
             int numFemalesToMigrate = (int)(this.femaleImmigrateRate * femaleLions.size());
+            int femalePrideCount = (int) population.getPrideLions(prideId).stream().filter(individual -> !individual.getIsMale()).count();
+            int femalePrideIdeal = (int) (((this.populationSize * (1 - this.nomadPercentage))/this.prideNumber) * (1 - this.malePridePercentage));
+            if (femalePrideCount > femalePrideIdeal) {
+                numFemalesToMigrate += (femalePrideCount - femalePrideIdeal);
+            }
             Random rand = new Random();
 
             List<Individual> malePride = Arrays.stream(population.getIndividuals())
@@ -701,7 +682,6 @@ public class LionOptimizationAlgorithm {
         for (int i = 0 + dataCenterIterator * 9 + cloudletIteration * 54; i < 9 + dataCenterIterator * 9
                 + cloudletIteration * 54; i++) {
             int gene = Math.abs(individual.getGene(iterator));
-            // int gene = individual.getGene(iterator);
             double mips = calculateMips(gene % 9);
 
             totalExecutionTime += cloudletList.get(i).getCloudletLength() / mips;
@@ -754,21 +734,5 @@ public class LionOptimizationAlgorithm {
     private double calculateCostFitness(double totalCost) {
         // The lower the cost, the higher the fitness
         return 1.0 / totalCost;
-    }
-
-    public void updateLocalBest(double fitness) {
-        if (fitness > localBestFitness) {
-            localBestFitness = fitness;
-            vmBestPositions = new ArrayList<>(vmPositions);
-            bestCloudletAllocation = new ArrayList<>(cloudletAllocation);
-        }
-    }
-
-    public List<Integer> getvmBestPositions() {
-        return vmBestPositions;
-    }
-
-    public List<Integer> getBestCloudletAllocation() {
-        return bestCloudletAllocation;
     }
 }
