@@ -87,3 +87,4 @@ public class Individual {
         this.vmPositions = Arrays.copyOf(newPositions, newPositions.length);
     }
 }
+

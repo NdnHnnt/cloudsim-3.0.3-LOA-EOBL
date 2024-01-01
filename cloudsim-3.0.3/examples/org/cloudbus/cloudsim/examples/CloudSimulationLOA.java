@@ -12,6 +12,7 @@ import java.util.DoubleSummaryStatistics;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.DoubleStream;
+import java.util.Locale;
 
 import org.cloudbus.cloudsim.Cloudlet;
 import org.cloudbus.cloudsim.CloudletSchedulerSpaceShared;
@@ -47,7 +48,6 @@ public class CloudSimulationLOA {
 	private static List<Vm> createVM(int userId, int vms) {
 
 		// Creates a container to store VMs.
-		// This list is passed to the broker later
 		LinkedList<Vm> list = new LinkedList<Vm>();
 
 		// VM Parameters
@@ -76,15 +76,15 @@ public class CloudSimulationLOA {
 		ArrayList<Double> seed = new ArrayList<Double>();
 		// Log.printLine(System.getProperty("user.dir")+
 		// "/dataset/RandSimple"+bot+"000.txt");
-		// Log.printLine(System.getProperty("user.dir") + "/cloudsim-3.0.3/SDSCDataset.txt");
-		Log.printLine(System.getProperty("user.dir") + "/cloudsim-3.0.3/random1000.txt");
+//		 Log.printLine(System.getProperty("user.dir") + "/cloudsim-3.0.3/datasets/SDSC/SDSC7395.txt");
+		Log.printLine(System.getProperty("user.dir") + "/cloudsim-3.0.3/datasets/randomSimple/randSimple1000.txt");
 
 		try {
 			// Opening and scanning the file
 			// File fobj = new File(System.getProperty("user.dir")+
 			// "/dataset/RandSimple"+bot+"000.txt");
-			// File fobj = new File(System.getProperty("user.dir") + "/cloudsim-3.0.3/SDSCDataset.txt");
-			File fobj = new File(System.getProperty("user.dir") + "/cloudsim-3.0.3/random1000.txt");
+//			 File fobj = new File(System.getProperty("user.dir") + "/cloudsim-3.0.3/datasets/SDSC/SDSCD7395.txt");
+			File fobj = new File(System.getProperty("user.dir") + "/cloudsim-3.0.3/datasets/randomSimple/randSimple1000.txt");
 			java.util.Scanner readFile = new java.util.Scanner(fobj);
 
 			while (readFile.hasNextLine() && cloudletcount > 0) {
@@ -137,11 +137,11 @@ public class CloudSimulationLOA {
 	 * Creates main() to run this example
 	 */
 	public static void main(String[] args) {
+		Locale.setDefault(new Locale("de", "DE"));
 		Log.printLine("Starting Cloud Simulation Example...");
 
 		try {
-			// First step: Initialize the CloudSim package. It should be called
-			// before creating any entities.
+			// A) Initialize the CloudSim package. It should be called before creating any entities.
 			int num_user = 1; // Number of grid users
 			Calendar calendar = Calendar.getInstance();
 			boolean trace_flag = false; // Mean trace events
@@ -149,16 +149,15 @@ public class CloudSimulationLOA {
 			BufferedWriter outputWriter = null;
 			outputWriter = new BufferedWriter(new FileWriter("filename.txt")); // Save output to text file
 			int vmNumber = 54; // The number of VMs created
-			// int cloudletNumber = bot*1000; // The number of Tasks created
-			// int cloudletNumber = 7395; // SDSC Dataset
+			// int cloudletNumber = bot*2000; // The number of Tasks created
+//			 int cloudletNumber = 7395; // SDSC Dataset
 			int cloudletNumber = 1000; // SDSC Dataset
 
-			// Initialize the CloudSim library
+			// B) Initialize the CloudSim library
 			CloudSim.init(num_user, calendar, trace_flag);
 
-			// Second step: Create Datacenters
-			// Datacenters are the resource providers in CloudSim. We need at least one of
-			// them to run a CloudSim simulation
+			// C) Create Datacenters
+			// Datacenters are the resource providers in CloudSim. We need at least one of them to run a CloudSim simulation
 			datacenter1 = createDatacenter("DataCenter_1", hostId);
 			hostId = 3;
 			datacenter2 = createDatacenter("DataCenter_2", hostId);
@@ -171,15 +170,15 @@ public class CloudSimulationLOA {
 			hostId = 15;
 			datacenter6 = createDatacenter("DataCenter_6", hostId);
 
-			// Third step: Create Broker
+			// D) Create Broker
 			DatacenterBroker broker = createBroker();
 			int brokerId = broker.getId();
 
-			// Fourth step: Create VMs and Cloudlets
+			// E) Create VMs and Cloudlets
 			vmlist = createVM(brokerId, vmNumber); // Creating vms
 			cloudletList = createCloudlet(brokerId, cloudletNumber); // Creating cloudlets
 
-			// Fifth step: Send VMs and Cloudlets to broker
+			// F) Send VMs and Cloudlets to broker
 			broker.submitVmList(vmlist);
 			broker.submitCloudletList(cloudletList);
 
@@ -190,49 +189,51 @@ public class CloudSimulationLOA {
 				System.out.println("Cloudlet Iteration Number " + cloudletIterator);
 
 				for (int dataCenterIterator = 1; dataCenterIterator <= 6; dataCenterIterator++) {
-					// Initialize Lion Optimization Algorithm
+					// G) Initialize Lion Optimization Algorithm
 					LionOptimizationAlgorithm loa = new LionOptimizationAlgorithm(75, 0, cloudletList, vmlist);
 
-					// Initialize population
+					// H) Initialize population
 					System.out.println("Datacenter " + dataCenterIterator + " Population Initialization");
 					Population population = loa.initPopulation(cloudletNumber, dataCenterIterator);
 
-					// Evaluate population
+					// I) Evaluate population
 					loa.evalPopulation(population, dataCenterIterator, cloudletIterator);
 
-					// Lion Optimization Algorithm Iteration
+					// J) Lion Optimization Algorithm Iteration
 					int iteration = 1;
 					while (iteration <= 15) {
-						// Get the fittest individual from population in every iteration
+						// J.I) Get the fittest individual from population in every iteration
 						Individual fit = population.getIndividual(iteration);
 
 						System.out.println(" ");
 						for (int j = 0; j < 9; j++) {
 							System.out.print(fit.getGene(j) + " ");
 						}
-						double fitnessValue = loa.calcFitness(fit, dataCenterIterator, iteration);
+						double fitnessValue = loa.calcFitness(fit, dataCenterIterator, cloudletIterator);
 						System.out.println("  fitness => " + fitnessValue);
-						// System.out.println(" fitness => " + loa.calcFitness(fit, dataCenterIterator,
-						// iteration));
+						// System.out.println(" fitness => " + loa.calcFitness(fit, dataCenterIterator, iteration));
 
-						// Apply lion behavior
-						population = loa.applyLionBehavior(population, dataCenterIterator, iteration);
+						// J.II) Apply lion behavior
+						population = loa.applyLionBehavior(population, dataCenterIterator, cloudletIterator);
 
-						// Evaluate population
-						// loa.evalPopulation(population, dataCenterIterator, cloudletIterator);
-
-						// Increment the current iteration
+						// J.III) Evaluate population
+						loa.evalPopulation(population, dataCenterIterator, cloudletIterator);
+						
+						// J.IV) Increment the current iteration
 						iteration++;
 					}
 
-					// Get the fittest individual from the Lion Optimization Algorithm
-					System.out.println("Best solution of LoA: " + population.getFittest(dataCenterIterator)
-							+ " For Datacenter-" + dataCenterIterator);
-					System.out.println(
-							"Highest Fitness Achieved: " + population.getFittest(dataCenterIterator).getFitness());
+					// K) Uncomment to apply eliteOppositionBasedLearning returns the fittest individual after applying EOBL
+					// Individual fittestIndividual = population.getFittest(dataCenterIterator);
+					// loa.eliteOppositionBasedLearning(fittestIndividual, dataCenterIterator, cloudletIterator);
 
-					// Assign Cloudlet to their respective VMs according to the fittest individual's
-					// chromosome
+					System.out.println("Best solution of LoA: " + population.getFittest(dataCenterIterator) + " For Datacenter-" + dataCenterIterator);
+					System.out.println("Highest Fitness Achieved: " + population.getFittest(dataCenterIterator).getFitness());
+
+					// System.out.println("Best solution of LOA + EOBL: " + eoblFittest + " For Datacenter-" + dataCenterIterator);
+					// System.out.println("Highest Fitness Achieved with LOA + EOBL: " + eoblFittest.getFitness());
+
+					// L) Assign Cloudlet to their respective VMs according to the fittest individual's chromosome
 					for (int assigner = 0 + (dataCenterIterator - 1) * 9 + cloudletIterator * 54; assigner < 9
 							+ (dataCenterIterator - 1) * 9 + cloudletIterator * 54; assigner++) {
 						// broker.bindCloudletToVm(assigner,
@@ -405,7 +406,7 @@ public class CloudSimulationLOA {
 		double waitTimeSum = 0.0;
 		double CPUTimeSum = 0.0;
 		int totalValues = 0;
-		DecimalFormat dft = new DecimalFormat("###.##");
+		DecimalFormat dft = new DecimalFormat("###,##");
 
 		double response_time[] = new double[size];
 
@@ -433,82 +434,82 @@ public class CloudSimulationLOA {
 
 		// Show the parameters and print them out
 		Log.printLine();
-		System.out.println("min = " + stats.getMin());
-		System.out.println("Response_Time: " + CPUTimeSum / totalValues);
+	    System.out.println(String.format("min = %,6f",stats.getMin()));
+	    System.out.println(String.format("Response_Time: %,6f",CPUTimeSum / totalValues));
 
-		Log.printLine();
-		Log.printLine("TotalCPUTime : " + CPUTimeSum);
-		Log.printLine("TotalWaitTime : " + waitTimeSum);
-		Log.printLine("TotalCloudletsFinished : " + totalValues);
-		Log.printLine();
-		Log.printLine();
+	    Log.printLine();
+	    Log.printLine(String.format("TotalCPUTime : %,6f",CPUTimeSum));
+	    Log.printLine("TotalWaitTime : "+waitTimeSum);
+	    Log.printLine("TotalCloudletsFinished : "+totalValues);
+	    Log.printLine();
+	    Log.printLine();
 
-		// Average Cloudlets Finished
-		Log.printLine("AverageCloudletsFinished : " + (CPUTimeSum / totalValues));
+	    // Average Cloudlets Finished
+	    Log.printLine(String.format("AverageCloudletsFinished : %,6f",(CPUTimeSum / totalValues)));
 
-		// Average Start Time
-		double totalStartTime = 0.0;
-		for (int i = 0; i < size; i++) {
-			totalStartTime = cloudletList.get(i).getExecStartTime();
-		}
-		double avgStartTime = totalStartTime / size;
-		System.out.println("Average StartTime: " + avgStartTime);
+	    // Average Start Time
+	    double totalStartTime = 0.0;
+	    for (int i = 0; i < size; i++) {
+	      totalStartTime += cloudletList.get(i).getExecStartTime();
+	    }
+	    double avgStartTime = totalStartTime / size;
+	    System.out.println(String.format("Average StartTime: %,6f",avgStartTime));
 
-		// Average Execution Time
-		double ExecTime = 0.0;
-		for (int i = 0; i < size; i++) {
-			ExecTime = cloudletList.get(i).getActualCPUTime();
-		}
-		double avgExecTime = ExecTime / size;
-		System.out.println("Average Execution Time: " + avgExecTime);
+	    // Average Execution Time
+	    double ExecTime = 0.0;
+	    for (int i = 0; i < size; i++) {
+	      ExecTime += cloudletList.get(i).getActualCPUTime();
+	    }
+	    double avgExecTime = ExecTime / size;
+	    System.out.println(String.format("Average Execution Time: %,6f",avgExecTime));
 
-		// Average Finish Time
-		double totalTime = 0.0;
-		for (int i = 0; i < size; i++) {
-			totalTime = cloudletList.get(i).getFinishTime();
-		}
-		double avgTAT = totalTime / size;
-		System.out.println("Average FinishTime: " + avgTAT);
+	    // Average Finish Time
+	    double totalTime = 0.0;
+	    for (int i = 0; i < size; i++) {
+	      totalTime += cloudletList.get(i).getFinishTime();
+	    }
+	    double avgTAT = totalTime / size;
+	    System.out.println(String.format("Average FinishTime: %,6f",avgTAT));
 
-		// Average Waiting Time
-		double avgWT = cloudlet.getWaitingTime() / size;
-		System.out.println("Average Waiting time: " + avgWT);
+	    // Average Waiting Time
+	    double avgWT = cloudlet.getWaitingTime() / size;
+	    System.out.println(String.format("Average Waiting time: %,6f",avgWT));
 
-		Log.printLine();
-		Log.printLine();
+	    Log.printLine();
+	    Log.printLine();
 
-		// Throughput
-		double maxFT = 0.0;
-		for (int i = 0; i < size; i++) {
-			double currentFT = cloudletList.get(i).getFinishTime();
-			if (currentFT > maxFT) {
-				maxFT = currentFT;
-			}
-		}
-		double throughput = size / maxFT;
-		System.out.println("Throughput: " + throughput);
+	    // Throughput
+	    double maxFT = 0.0;
+	    for (int i = 0; i < size; i++) {
+	      double currentFT = cloudletList.get(i).getFinishTime();
+	      if (currentFT > maxFT) {
+	        maxFT = currentFT;
+	      }
+	    }
+	    double throughput = size / maxFT;
+	    System.out.println(String.format("Throughput: %,9f",throughput));
 
-		// Makespan
-		double makespan = 0.0;
-		double makespan_total = makespan + cloudlet.getFinishTime();
-		System.out.println("Makespan: " + makespan_total);
+	    // Makespan
+	    double makespan = 0.0;
+	    double makespan_total = makespan + cloudlet.getFinishTime();
+	    System.out.println(String.format("Makespan: %,f",makespan_total));
 
-		// Imbalance Degree
-		double degree_of_imbalance = (stats.getMax() - stats.getMin()) / (CPUTimeSum / totalValues);
-		System.out.println("Imbalance Degree: " + degree_of_imbalance);
+	    // Imbalance Degree
+	    double degree_of_imbalance = (stats.getMax() - stats.getMin()) / (CPUTimeSum / totalValues);
+	    System.out.println(String.format("Imbalance Degree: %,3f",degree_of_imbalance));
 
-		// Scheduling Length
-		double scheduling_length = waitTimeSum + makespan_total;
-		Log.printLine("Total Scheduling Length: " + scheduling_length);
+	    // Scheduling Length
+	    double scheduling_length = waitTimeSum + makespan_total;
+	    Log.printLine(String.format("Total Scheduling Length: %,f", scheduling_length));
 
-		// CPU Resource Utilization
-		double resource_utilization = (CPUTimeSum / (makespan_total * 54)) * 100;
-		Log.printLine("Resouce Utilization: " + resource_utilization);
+	    // CPU Resource Utilization
+	    double resource_utilization = (CPUTimeSum / (makespan_total * 54)) * 100;
+	    Log.printLine(String.format("Resouce Utilization: %,f",resource_utilization));
 
-		// Energy Consumption
-		Log.printLine(String.format("Total Energy Consumption: %.2f    kWh",
-				(datacenter1.getPower() + datacenter2.getPower() + datacenter3.getPower() + datacenter4.getPower()
-						+ datacenter5.getPower() + datacenter6.getPower()) / (3600 * 1000)));
+	    // Energy Consumption
+	    Log.printLine(String.format("Total Energy Consumption: %,2f    kWh",
+	        (datacenter1.getPower() + datacenter2.getPower() + datacenter3.getPower() + datacenter4.getPower()
+	            + datacenter5.getPower() + datacenter6.getPower()) / (3600 * 1000)));
+	  }
+
 	}
-
-}

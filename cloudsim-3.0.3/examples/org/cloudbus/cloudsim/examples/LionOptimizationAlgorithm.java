@@ -45,12 +45,11 @@ public class LionOptimizationAlgorithm {
         // The parameters below are based on the reference paper
         this.prideNumber = 4;
         this.roamingPercentage = 0.2;
-        this.matingPercentage = 0.3;
         this.nomadPercentage = 0.2;
         this.malePridePercentage = 0.2;
         this.maleNomadPercentage = 1 - this.malePridePercentage;
-        // The parameters below are based on the reference paper
-        this.femaleImmigrateRate = 0;
+        this.femaleImmigrateRate = 0.4;
+        this.matingPercentage = 0.3;
     }
 
     // 1) Initialize the Population of Lions
@@ -103,75 +102,86 @@ public class LionOptimizationAlgorithm {
     }
 
     // 2) Apply Lion Algorithm
-    public Population applyLionBehavior(Population population, int dataCenterIterator, int iteration) {
+    public Population applyLionBehavior(Population population, int dataCenterIterator, int cloudletIterator) {
         // Apply behavior based on whether the individual is a nomad or part of a pride
-        // Step 2.1) Hunt
-        prideHunt(population, dataCenterIterator, iteration);
+        // Step 2.1) HuntPride
+        prideHunt(population, dataCenterIterator, cloudletIterator);
 
-        // Step 2.2) Nomad Roam
-        nomadRoam(population, dataCenterIterator, iteration);
+        // Step 2.2) Pride Roam
+        prideRoam(population, dataCenterIterator, cloudletIterator);
 
-        // Step 2.3) Nomad Attack
+        // Step 2.3) Mating on Pride
+        prideMating(population, dataCenterIterator, cloudletIterator);
+
+        // Step 2.4) Nomad Roam
+        nomadRoam(population, dataCenterIterator, cloudletIterator);
+
+        // Step 2.5) Mating on Nomad
+        nomadMating(population, dataCenterIterator, cloudletIterator);
+
+        // Step 2.6) Nomad Attack
         nomadAttack(population);
 
-        // Step 2.4) Pride Immigration (THERE'S SOMETHING WRONG IN HERE!!!!)
-        prideImmigrate(population);
+        // Step 2.7) Pride Immigration
+         prideImmigrate(population);
 
-        // Step 2.5) Nomad Immigration
-        nomadImmigrate(population);
+        // Step 2.8) Nomad Immigration
+         nomadImmigrate(population);
+
+        // Step 2.9) Apply Equilibrium
+         lionEquilibrium(population);
+        
         return population;
     }
 
     // 2.1) Apply Hunting on Pride
     public void prideHunt(Population population, int dataCenterIterator, int cloudletIteration) {
-        // 2.1.2) Select Female Hunters on each prides
+        // 2.1.2) Select Female Hunters on each pride
         Map<Integer, List<Individual>> huntersByPride = selectFemaleHunters(population);
-
-        for (Individual individual : population.getIndividuals()) {
-            // 2.1.3) Check if the individual belongs to a pride
-            if (individual.getPrideId() > 0) {
-                // 2.1.4) Select the female hunters
-                List<Individual> hunters = huntersByPride.get(individual.getPrideId());
-
-                // 2.1.5) Partition the hunters into three groups
-                List<Individual> leftWing = new ArrayList<>();
-                List<Individual> center = new ArrayList<>();
-                List<Individual> rightWing = new ArrayList<>();
-                partitionHunters(hunters, leftWing, center, rightWing, dataCenterIterator, cloudletIteration);
-
-                // 2.1.6) Calculate the prey's position
-                int[] prey = calculatePreyPosition(hunters, dataCenterIterator);
-
-                // 2.1.7) Move each hunter towards the prey
-                if (hunters == null) {
-                    hunters = new ArrayList<>();
+    
+        // Iterate over each pride
+        for (int prideId = 1; prideId <= this.prideNumber; prideId++) {
+            // 2.1.4) Select the female hunters for the current pride
+            List<Individual> hunters = huntersByPride.get(prideId);
+    
+            // Skip the process if there are no hunters in the current pride
+            if (hunters == null || hunters.isEmpty()) {
+                continue;
+            }
+    
+            // 2.1.5) Partition the hunters into three groups
+            List<Individual> leftWing = new ArrayList<>();
+            List<Individual> center = new ArrayList<>();
+            List<Individual> rightWing = new ArrayList<>();
+            partitionHunters(hunters, leftWing, center, rightWing, dataCenterIterator, cloudletIteration);
+    
+            // 2.1.6) Calculate the prey's position
+            int[] prey = calculatePreyPosition(hunters, dataCenterIterator);
+    
+            // 2.1.7) Move each hunter towards the prey
+            for (Individual hunter : hunters) {
+                int[] oldPositions = Arrays.copyOf(hunter.getVmPositions(), hunter.getVmPositions().length);
+                int[] newPositions;
+    
+                if (center.contains(hunter)) {
+                    newPositions = calculateNewCenterHunterPosition(hunter, prey, dataCenterIterator);
+                } else {
+                    newPositions = calculateNewWingHunterPosition(hunter, prey, dataCenterIterator);
                 }
-                else {
-                    for (Individual hunter : hunters) {
-                        int[] oldPositions = Arrays.copyOf(hunter.getVmPositions(), hunter.getVmPositions().length);
-                        int[] newPositions;
     
-                        if (center.contains(hunter)) {
-                            newPositions = calculateNewCenterHunterPosition(hunter, prey, dataCenterIterator);
-                        } else {
-                            newPositions = calculateNewWingHunterPosition(hunter, prey, dataCenterIterator);
-                        }
+                double oldFitness = hunter.getFitness();
+                hunter.setVmPositions(newPositions);
+                double newFitness = calcFitness(hunter, dataCenterIterator, cloudletIteration);
     
-                        double oldFitness = hunter.getFitness();
-                        hunter.setVmPositions(newPositions);
-                        double newFitness = calcFitness(hunter, dataCenterIterator, cloudletIteration);
-                        // 2.1.8) The new position is not better, update the hunter's fitness to
-                        // oldFitness
-                        if (newFitness < oldFitness) {
-                            hunter.setVmPositions(oldPositions);
-                            hunter.setFitness(oldFitness);
-                        }
-                    }
-                }  
+                // 2.1.8) If the new position is not better, revert to old position and fitness
+                if (newFitness < oldFitness) {
+                    hunter.setVmPositions(oldPositions);
+                    hunter.setFitness(oldFitness);
+                }
             }
         }
     }
-
+    
     // 2.1.2) Select Female Hunters on each prides
     public Map<Integer, List<Individual>> selectFemaleHunters(Population population) {
         Map<Integer, List<Individual>> individualsByPride = Arrays.stream(population.getIndividuals())
@@ -186,7 +196,7 @@ public class LionOptimizationAlgorithm {
             List<Individual> females = new ArrayList<>(entry.getValue());
             Random rand = new Random();
             // 2.1.2.3) Randomly decide the number of hunters, at least one
-            int numHunters = rand.nextInt(females.size()) + 1;
+            int numHunters = rand.nextInt(females.size());
 
             // 2.1.2.4) Save the selected hunters in a list
             List<Individual> hunters = new ArrayList<>();
@@ -212,7 +222,7 @@ public class LionOptimizationAlgorithm {
             hunters = new ArrayList<>();
         }
         hunters.sort(Comparator.comparingDouble(Individual::getFitness));
-        hunters.sort(Comparator.comparingDouble((Individual a) -> a.getFitness()));
+        hunters.sort(Comparator.comparingDouble((Individual a) -> a.getFitness()).reversed());
 
         // 2.1.5.2) Partition the sorted hunters into three groups
         int size = hunters.size();
@@ -242,14 +252,14 @@ public class LionOptimizationAlgorithm {
             int[] totalPositions = new int[hunters.get(0).getVmPositions().length];
             int count = 0;
 
-            int minGene = (dataCenterIterator) * 9;
-            int maxGene = ((dataCenterIterator + 1) * 9) - 1;
+            // int minGene = (dataCenterIterator) * 9;
+            // int maxGene = ((dataCenterIterator + 1) * 9) - 1;
 
             for (Individual hunter : hunters) {
                 if (hunter.getFitness() > 0) {
                     int[] hunterPositions = hunter.getVmPositions();
                     for (int i = 0; i < hunterPositions.length; i++) {
-                        totalPositions[i] += Math.abs(hunterPositions[i]);
+                        totalPositions[i] += (hunterPositions[i]);
                     }
                     count++;
                 }
@@ -257,10 +267,10 @@ public class LionOptimizationAlgorithm {
 
             if (count != 0) {
                 for (int i = 0; i < preyPositions.length; i++) {
-                    preyPositions[i] = Math.abs(totalPositions[i] / count);
+                    preyPositions[i] = (totalPositions[i] / count);
                     // Ensure preyPositions[i] is within the range of minGene and maxGene
                     // preyPositions[i] = Math.max(0, Math.min(62, preyPositions[i]));
-                    preyPositions[i] = Math.max(minGene, Math.min(maxGene, preyPositions[i]));
+                    // preyPositions[i] = Math.max(minGene, Math.min(maxGene, preyPositions[i]));
                 }
             }
             return preyPositions;
@@ -272,34 +282,17 @@ public class LionOptimizationAlgorithm {
         int[] hunterPositions = hunter.getVmPositions();
         int[] newPositions = new int[hunterPositions.length];
         Random rand = new Random();
-        int minGene = (dataCenterIterator) * 9;
-        int maxGene = (dataCenterIterator + 1) * 9 - 1;
 
         for (int i = 0; i < hunterPositions.length; i++) {
             if (hunterPositions[i] < prey[i]) {
-                // int bound = Math.abs((prey[i] - hunterPositions[i]) + hunterPositions[i]);
-                // if (bound <= 0) {
-
-                //     newPositions[i] = rand.nextInt(1);
-                // } else {
-                //     newPositions[i] = rand.nextInt(bound);
-                // }
                 newPositions[i] = rand.nextInt(prey[i] - hunterPositions[i]) + hunterPositions[i];
             } else if (hunterPositions[i] > prey[i]) {
-                // int bound = Math.abs((hunterPositions[i] - prey[i]) + prey[i]);
-                // if (bound <= 0) {
-                //     newPositions[i] = rand.nextInt(1);
-                // } else {
-                //     newPositions[i] = rand.nextInt(bound);
-                // }
                 newPositions[i] = rand.nextInt(hunterPositions[i] - prey[i]) + prey[i];
             }
             else {
                 newPositions[i] = hunterPositions[i];
             }
-            // newPositions[i] = Math.max(minGene, Math.min(maxGene, newPositions[i]));
         }
-
         return newPositions;
     }
 
@@ -308,17 +301,15 @@ public class LionOptimizationAlgorithm {
         int[] hunterPositions = hunter.getVmPositions();
         int[] newPositions = new int[hunterPositions.length];
         Random rand = new Random();
-        int minGene = (dataCenterIterator) * 9;
-        int maxGene = ((dataCenterIterator + 1) * 9) - 1;
 
         for (int i = 0; i < hunterPositions.length; i++) {
-            int temp = Math.abs(2 * prey[i] - hunterPositions[i]);
+            int temp = Math.abs((2 * prey[i]) - hunterPositions[i]);
             if (temp < prey[i]) {
                 newPositions[i] = rand.nextInt((prey[i] - temp)) + temp;
             } 
-//            else if (temp < prey[i]){
-//                newPositions[i] = rand.nextInt((temp - prey[i])) + prey[i];
-//            }
+            // else if (temp > prey[i]){
+            //     newPositions[i] = rand.nextInt((temp - prey[i])) + prey[i];
+            // }
             else {
                 newPositions[i] = hunterPositions[i];
             }
@@ -328,37 +319,148 @@ public class LionOptimizationAlgorithm {
         return newPositions;
     }
 
-    // 2.2) Nomad Roam
-    public void nomadRoam(Population population, int dataCenterIterator, int cloudletIteration) {
+    // 2.2) Pride Roam
+    public void prideRoam(Population population, int dataCenterIterator, int cloudletIteration) {
         Random rand = new Random();
-        double pr = 0.5;
+        // double pr = this.roamingPercentage;
     
         for (Individual lion : population.getIndividuals()) {
             // 2.2.1) Check if the lion is a nomad
-            if (lion.getPrideId() == 0) {
+            if (lion.getPrideId() > 0 && lion.getIsMale()) {
                 // 2.2.2) Check if the lion should move
-                if (rand.nextDouble() < pr) {
+                if (rand.nextDouble() <= this.roamingPercentage) {
                     int[] oldPositions = lion.getVmPositions();
                     int[] newPositions = new int[oldPositions.length];
     
+                    // int minGene = (dataCenterIterator - 1) * 9;
+                    // int maxGene = ((dataCenterIterator + 1) * 9) - 1;
                     int minGene = (dataCenterIterator - 1) * 9;
-                    int maxGene = ((dataCenterIterator + 1) * 9) - 1;
+                    int maxGene = ((dataCenterIterator) * 9) - 1;
     
                     for (int i = 0; i < oldPositions.length; i++) {
                         // 2.2.3) Replace with your own logic for generating a random position
-                        newPositions[i] = rand.nextInt(maxGene - minGene + 1) + minGene;
+                        newPositions[i] = rand.nextInt(maxGene - minGene) + minGene;
     
-                        // Ensure the new position is within the range of minGene and maxGene
-                        newPositions[i] = Math.max(minGene, Math.min(maxGene, newPositions[i]));
+                        // 2.2.4) Ensure the new position is within the range of minGene and maxGene
+                        // newPositions[i] = Math.max(minGene, Math.min(maxGene, newPositions[i]));
                     }
     
                     double oldFitness = lion.getFitness();
     
-                    // 2.2.4) Calculate the fitness at the new position
+                    // 2.4.4) Calculate the fitness at the new position
                     lion.setVmPositions(newPositions);
                     double newFitness = calcFitness(lion, dataCenterIterator, cloudletIteration);
     
-                    // 2.2.5) If the new position is not better, revert the lion's position and
+                    // 2.4.5) If the new position is not better, revert the lion's position and fitness
+                    if (newFitness < oldFitness) {
+                        lion.setVmPositions(oldPositions);
+                        lion.setFitness(oldFitness);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2.3) Pride Mating
+    public void prideMating(Population population, int dataCenterIterator, int cloudletIteration) {
+
+        // 2.3.1) Get the prides from the population
+        List<Individual[]> prides = Arrays.stream(population.getIndividuals())
+            .filter(individual -> individual.getPrideId() > 0)
+            .collect(Collectors.groupingBy(Individual::getPrideId))
+            .values()
+            .stream()
+            .map(list -> list.toArray(new Individual[0]))
+            .collect(Collectors.toList());   
+        
+        // 2.3.2) Apply mating operation to the prides
+            for (Individual[] pride : prides) {
+                // 2.3.3) Ensure there are at least two individuals in the pride
+                if (pride.length < 2) {
+                    continue;
+                }
+
+                // 2.3.4) Separate males and females in the pride
+                Individual[] males = Arrays.stream(pride)
+                .filter(individual -> individual.getIsMale())
+                .toArray(Individual[]::new);
+                Individual[] females = Arrays.stream(pride)
+                .filter(individual -> !individual.getIsMale())
+                .toArray(Individual[]::new);
+
+                // 2.3.5) Ensure there is at least one male and one female in the pride
+                if (males.length == 0 || females.length == 0) {
+                    continue;
+                }
+
+                Random rand = new Random();
+                int numMate = rand.nextInt(females.length + 1);
+
+                if (rand.nextDouble() <= this.matingPercentage) { 
+                    // 2.3.6) Select one male and one female for mating
+                    Individual parent1 = males[new Random().nextInt(males.length)];
+                    Individual parent2 = females[new Random().nextInt(females.length)];
+
+                    // 2.3.7) Create two new individuals
+                    Individual offspring1 = new Individual(parent1.getCloudletLength(), dataCenterIterator);
+                    Individual offspring2 = new Individual(parent1.getCloudletLength(), dataCenterIterator);
+
+                    // 2.3.8) Determine a crossover point
+                    int crossoverPoint = new Random().nextInt(parent1.getCloudletLength());
+
+                    // 2.3.9) Perform crossover
+                    for (int j = 0; j < parent1.getCloudletLength(); j++) {
+                        if (j < crossoverPoint) {
+                            offspring1.setGene(j, parent1.getGene(j));
+                            offspring2.setGene(j, parent2.getGene(j));
+                        } else {
+                            offspring1.setGene(j, parent1.getGene(j));
+                            offspring2.setGene(j, parent2.getGene(j));
+                        }
+                    }
+
+                    // Set the gender of the offspring and their pride
+                    offspring1.setIsMale(true);
+                    offspring2.setIsMale(false);
+                    offspring1.setPrideId(parent1.getPrideId());
+                    offspring2.setPrideId(parent1.getPrideId());
+                    }
+                }     
+        }
+
+       
+    // 2.4) Nomad Roam
+    public void nomadRoam(Population population, int dataCenterIterator, int cloudletIteration) {
+        Random rand = new Random();
+    
+        for (Individual lion : population.getIndividuals()) {
+            // 2.4.1) Check if the lion is a nomad
+            if (lion.getPrideId() == 0) {
+                // 2.4.2) Check if the lion should move
+                if (rand.nextDouble() <= this.roamingPercentage) {
+                    int[] oldPositions = lion.getVmPositions();
+                    int[] newPositions = new int[oldPositions.length];
+    
+                    // int minGene = (dataCenterIterator - 1) * 9;
+                    // int maxGene = ((dataCenterIterator + 1) * 9) - 1;
+                    int minGene = (dataCenterIterator - 1) * 9;
+                    int maxGene = ((dataCenterIterator) * 9) - 1;
+    
+                    for (int i = 0; i < oldPositions.length; i++) {
+                        // 2.4.3) Replace with your own logic for generating a random position
+                        newPositions[i] = rand.nextInt(maxGene - minGene) + minGene;
+    
+                        // Ensure the new position is within the range of minGene and maxGene
+                        // newPositions[i] = Math.max(minGene, Math.min(maxGene, newPositions[i]));
+                    }
+    
+                    double oldFitness = lion.getFitness();
+    
+                    // 2.4.4) Calculate the fitness at the new position
+                    lion.setVmPositions(newPositions);
+                    double newFitness = calcFitness(lion, dataCenterIterator, cloudletIteration);
+    
+                    // 2.4.5) If the new position is not better, revert the lion's position and
                     // fitness
                     if (newFitness < oldFitness) {
                         lion.setVmPositions(oldPositions);
@@ -369,134 +471,219 @@ public class LionOptimizationAlgorithm {
         }
     }
 
-    // 2.3) Nomads Attack the Pride Lions
+    // 2.5) Mating on Nomad
+    public void nomadMating(Population population, int dataCenterIterator, int cloudletIteration) {
+        // 2.5.1) Get the nomad lions from the population
+        Individual[] nomadLions = Arrays.stream(population.getIndividuals())
+        .filter(individual -> individual.getPrideId() == 0)
+        .toArray(Individual[]::new);
+
+        // 2.5.2) Ensure there are at least two nomad lions
+        if (nomadLions.length < 2) {
+            return;
+        }
+
+        // 2.5.3) Separate males and females among the nomad lions
+        Individual[] males = Arrays.stream(nomadLions)
+        .filter(Individual::getIsMale)
+        .toArray(Individual[]::new);
+        Individual[] females = Arrays.stream(nomadLions)
+        .filter(individual -> !individual.getIsMale())
+        .toArray(Individual[]::new);
+
+        // 2.5.4) Ensure there is at least one male and one female among the nomad lions
+        if (males.length == 0 || females.length == 0) {
+            return;
+        }
+
+        Random rand = new Random();
+        if (rand.nextDouble() <= this.matingPercentage) { 
+
+            // 2.5.5) Select one male and one female for mating
+            Individual parent1 = males[new Random().nextInt(males.length)];
+            Individual parent2 = females[new Random().nextInt(females.length)];
+
+            // 2.5.6) Create two new individuals
+            Individual offspring1 = new Individual(parent1.getCloudletLength(), dataCenterIterator);
+            Individual offspring2 = new Individual(parent1.getCloudletLength(), dataCenterIterator);
+
+            // 2.5.7) Perform crossover
+            int crossoverPoint = new Random().nextInt(parent1.getCloudletLength());
+            for (int j = 0; j < parent1.getCloudletLength(); j++) {
+                if (j < crossoverPoint) {
+                    offspring1.setGene(j, parent1.getGene(j));
+                    offspring2.setGene(j, parent2.getGene(j));
+                } else {
+                    offspring1.setGene(j, parent1.getGene(j));
+                    offspring2.setGene(j, parent2.getGene(j));
+                }
+            }
+
+            // 2.5.8) Perform crossover
+            offspring1.setIsMale(true);
+            offspring2.setIsMale(false);
+            offspring1.setPrideId(parent1.getPrideId());
+            offspring2.setPrideId(parent1.getPrideId());       
+        } 
+    }
+    
+    // 2.6) Nomads Attack the Pride Lions
     public void nomadAttack(Population population) {
-        // 2.3.1) Method to get all nomad lions
+        // 2.6.1) Method to get all nomad lions
         List<Individual> nomads = population.getNomads();
         Random rand = new Random();
 
-        // 2.3.2) Random number of nomad attacks
+        // 2.6.2) Random number of nomad attacks
         int numAttacks = rand.nextInt(nomads.size()) + 1;
 
         for (int i = 0; i < numAttacks; i++) {
             Individual nomadLion = nomads.get(rand.nextInt(nomads.size()));
 
-            // 2.3.3) Ensure the nomad lion is male
+            // 2.6.3) Ensure the nomad lion is male
             if (!nomadLion.getIsMale()) {
                 continue;
             }
 
-            // 2.3.4) Assuming a constant number of prides = 4
+            // 2.6.4) Assuming a constant number of prides = 4
             int targetPrideId = rand.nextInt(prideNumber) + 1;
-            // 2.3.5) Method to get the male lion with the lowest fitness from a pride
+            // 2.6.5) Method to get the male lion with the lowest fitness from a pride
             Individual lowestFitnessPrideMaleLion = population.getLowestFitnessPrideMaleLion(targetPrideId);
 
-            // 2.3.6) If the nomad lion has better fitness, it replaces the male pride lion
+            // 2.6.6) If the nomad lion has better fitness, it replaces the male pride lion
             if (nomadLion.getFitness() > lowestFitnessPrideMaleLion.getFitness()) {
-                // 2.3.7) The nomad lion joins the pride
+                // 2.6.7) The nomad lion joins the pride
                 nomadLion.setPrideId(targetPrideId);
 
-                // 2.3.8) The replaced male pride lion becomes a nomad
+                // 2.6.8) The replaced male pride lion becomes a nomad
                 lowestFitnessPrideMaleLion.setPrideId(0);
-                // 2.3.9) Ensure the lion remains male
+                // 2.6.9) Ensure the lion remains male
                 lowestFitnessPrideMaleLion.setIsMale(true);
             }
         }
     }
 
-    // 2.4) Immigrate the female pride
+    // 2.7) Immigrate the female pride
     public void prideImmigrate(Population population) {
         for (int prideId = 1; prideId <= this.prideNumber; prideId++) {
             List<Individual> prideLions = population.getPrideLions(prideId);
-            int numFemalesToMigrate = (int)(this.femaleImmigrateRate * prideLions.size());
+
+            List<Individual> femaleLions = prideLions.stream()
+                .filter(individual -> !individual.getIsMale())
+                .collect(Collectors.toList());
+
+            int numFemalesToMigrate = (int)(this.femaleImmigrateRate * femaleLions.size());
             Random rand = new Random();
 
+            List<Individual> malePride = Arrays.stream(population.getIndividuals())
+                .filter(individual -> individual.getIsMale() && individual.getPrideId() > 0)
+                .sorted(Comparator.comparingDouble(Individual::getFitness).reversed())
+                .collect(Collectors.toList());
+
             for (int i = 0; i < numFemalesToMigrate; i++) {
-                List<Individual> femaleLions = prideLions.stream().filter(individual -> !individual.getIsMale()).collect(Collectors.toList());
                 if (!femaleLions.isEmpty()) {
                     int index = rand.nextInt(femaleLions.size());
                     Individual femaleLion = femaleLions.get(index);
                     femaleLion.setPrideId(0);  // Set nomadic status
                 }
             }
-        }
-    }
 
-// 2.5) Immigrate the female nomad
-public void nomadImmigrate(Population population) {
-    List<Individual> femaleNomads = Arrays.stream(population.getIndividuals())
-        .filter(individual -> !individual.getIsMale() && individual.getPrideId() == 0)
-        .sorted(Comparator.comparingDouble(Individual::getFitness))
-        .collect(Collectors.toList());
-
-    for (int prideId = 1; prideId <= prideNumber; prideId++) {
-        long femaleCount = population.getPrideLions(prideId).stream().filter(individual -> !individual.getIsMale()).count();
-
-        if (femaleCount < (int) ((1 - this.malePridePercentage) * population.getPrideLions(prideId).size())) {
-            if (!femaleNomads.isEmpty()) {
-                Individual highestFitnessFemaleNomad = femaleNomads.remove(0);
-                highestFitnessFemaleNomad.setPrideId(prideId);
+            int malePrideCount = (int) population.getPrideLions(prideId).stream().filter(individual -> individual.getIsMale()).count();
+            if (malePrideCount > (int) (this.malePridePercentage * (this.populationSize * (1 - this.nomadPercentage)))){
+                if (!malePride.isEmpty()) {
+                    Individual lowestFitnessMalePride = malePride.get(0);
+                    lowestFitnessMalePride.setPrideId(0);
+                }
             }
         }
     }
-}
 
+    // 2.8) Immigrate the female nomad
+    public void nomadImmigrate(Population population) {
+        List<Individual> femaleNomads = Arrays.stream(population.getIndividuals())
+            .filter(individual -> !individual.getIsMale() && individual.getPrideId() == 0)
+            .sorted(Comparator.comparingDouble(Individual::getFitness))
+            .collect(Collectors.toList());
+        
+        for (int prideId = 1; prideId <= prideNumber; prideId++) {
+            int femalePrideCount = (int) population.getPrideLions(prideId).stream().filter(individual -> !individual.getIsMale()).count();
+            
+            if (femalePrideCount < (int) ((1 - this.malePridePercentage) * population.getPrideLions(prideId).size())) {
+                if (!femaleNomads.isEmpty()) {
+                	Individual highestFitnessFemaleNomad = femaleNomads.get(0);
+                    highestFitnessFemaleNomad.setPrideId(prideId);
+                }
+            }
+        }
+    }
 
-    // // 2.4) Immigrate the female pride
-    // public void prideImmigrate(Population population) {
-    //     // 2.4.1) Iterate through each pride
-    //     for (int prideId = 1; prideId <= this.prideNumber; prideId++) {
-    //         List<Individual> prideLions = population.getPrideLions(prideId);
-    //         // List<Individual> femaleLions = population.getPrideFemaleLions(prideId);
-    //         Random rand = new Random();
+    // 2.9) Equilibrium Check
+    public void lionEquilibrium(Population population) {
+        List<Individual> femaleNomads = population.getNomads()
+            .stream()
+            .filter(individual -> !individual.getIsMale())
+            .sorted(Comparator.comparingDouble(Individual::getFitness).reversed())
+            .collect(Collectors.toList());
+        
+        List<Individual> maleNomads = population.getNomads()
+            .stream()
+            .filter(individual -> individual.getIsMale())
+            .sorted(Comparator.comparingDouble(Individual::getFitness).reversed())
+            .collect(Collectors.toList());
+        
+        int currentNomads = population.getNomads().size();
+        int idealNomads = (int) (this.nomadPercentage * this.populationSize);       
 
-    //         // 2.4.2) Separate female lions
-    //         // femaleLions = femaleLions.stream()
-    //         List<Individual> femaleLions = prideLions.stream().filter(individual -> !individual.getIsMale()).collect(Collectors.toList());
+        if (currentNomads > idealNomads){
+            if (femaleNomads.size() > (this.malePridePercentage * idealNomads)){
+                int numFemalesToRemove = (int) (femaleNomads.size() - (this.malePridePercentage * idealNomads));
+                for (int i = 0; i < numFemalesToRemove; i++) {
+                    Individual femaleNomad = femaleNomads.get(0);
+                    femaleNomad.setPrideId(-1);
+                    femaleNomad = femaleNomads.remove(0);
+                }
+            }
+            if (maleNomads.size() > ((1 - this.malePridePercentage) * idealNomads)){
+                int numMalesToRemove = (int)(maleNomads.size() - ((1 - this.malePridePercentage) * idealNomads));
+                for (int i = 0; i < numMalesToRemove; i++) {
+                    Individual maleNomad = maleNomads.get(0);
+                    maleNomad.setPrideId(-1);
+                    maleNomad = maleNomads.remove(0);
+                }
+            }
+        }
+    }
 
-    //         // 2.4.3) Calculate the number of lions to migrate
-    //         int numFemalesToMigrate = (int) (this.femaleImmigrateRate * femaleLions.size());
-    //         // int numFemalesToMigrate = (int) (0 * femaleLions.size());
-    //         // int numFemalesToMigrate = 4;
-
-    //         // 2.4.4) Migrate the selected number of female lions
-    //         for (int i = 0; i < numFemalesToMigrate; i++) {
-    //             if (!femaleLions.isEmpty()) {
-    //                 int index = rand.nextInt(femaleLions.size());
-    //                 Individual femaleLion = femaleLions.get(index);
-    //                 // 2.4.5) Setting prideId to 0 to indicate nomadic status
-    //                 femaleLion.setPrideId(0);
-    //                 femaleLions.remove(index);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // // 2.5) Immigrate the female nomad
-    // public void nomadImmigrate(Population population) {
-    //     // 2.5.1) Sort all female nomads by fitness value
-    //     List<Individual> femaleNomads = Arrays.stream(population.getIndividuals())
-    //         .filter(individual -> !individual.getIsMale() && individual.getPrideId() == 0)
-    //         .sorted((individual1, individual2) -> Double.compare(individual2.getFitness(), individual1.getFitness()))
-    //         .collect(Collectors.toList());
-
-    //     // 2.5.2) Look for prides with female emptiness
-    //     for (int prideId = 1; prideId <= prideNumber; prideId++) {
-    //         List<Individual> prideLions = population.getPrideLions(prideId);
-    //         int femaleCount = (int) prideLions.stream().filter(individual -> !individual.getIsMale()).count();
-    //         int totalPrideSize = prideLions.size();
-
-    //         // 2.5.3) Check if the pride follows the rules
-    //         if ((totalPrideSize < (((1 - this.roamingPercentage) * this.populationSize)/this.prideNumber)) && (femaleCount < (int) ((1 - this.malePridePercentage) * totalPrideSize))) {
-    //             // 2.5.4) Make the highest fitness female nomad enter the pride
-    //             if (!femaleNomads.isEmpty()) {
-    //                 Individual highestFitnessFemaleNomad = femaleNomads.get(femaleNomads.size() - 1);
-    //                 highestFitnessFemaleNomad.setPrideId(prideId);
-    //                 femaleNomads.remove(highestFitnessFemaleNomad);
-    //             }
-    //         }
-    //     }
-    // }
+    // Step 2.10) Apply Elite Opposition-Based Learning
+    public Individual eliteOppositionBasedLearning(Individual bestLion, int dataCenterIterator, int cloudletIterator){   
+        int minGene = (dataCenterIterator - 1) * 9;
+        int maxGene = ((dataCenterIterator + 1) * 9) - 1;
+    
+        // Save the initial fitness of the best lion
+        double initialFitness = bestLion.getFitness();
+    
+        // Apply opposition-based learning
+        for (int gene = 0; gene < bestLion.getCloudletLength(); gene++) {
+            int opposite = maxGene - (bestLion.getGene(gene) - minGene);
+            bestLion.setGene(gene, opposite);
+        }
+    
+        // Recalculate the fitness of the best lion
+        double newFitness = calcFitness(bestLion, dataCenterIterator, cloudletIterator);
+    
+        // Compare the fitness of the bSest lion before and after opposition-based learning
+        if (newFitness < initialFitness) {
+            // If the fitness has decreased, revert the changes
+            for (int gene = 0; gene < bestLion.getCloudletLength(); gene++) {
+                int original = minGene + maxGene - bestLion.getGene(gene);
+                bestLion.setGene(gene, original);
+            }
+        } else {
+            // If the fitness has increased, update the fitness of the best lion
+            bestLion.setFitness(newFitness);
+        }
+    
+        return bestLion;
+    }
 
     public void evalPopulation(Population population, int dataCenterIterator, int cloudletIteration) {
         for (Individual individual : population.getIndividuals()) {
@@ -527,7 +714,7 @@ public void nomadImmigrate(Population population) {
         double costFitness = calculateCostFitness(totalCost);
         double fitness = makespanFitness + costFitness;
 
-        individual.setFitness(Math.abs(fitness));
+        individual.setFitness(fitness);
         return fitness;
     }
 
@@ -538,29 +725,6 @@ public void nomadImmigrate(Population population) {
         }
         return totalFitness;
     }
-
-    // public int applyLionBehaviorToGene(int gene, int dataCenterIterator) {
-    // int minGene = dataCenterIterator * 9;
-    // int maxGene = (dataCenterIterator + 1) * 9 - 1;
-
-    // if (gene < minGene || gene > maxGene) {
-    // return generateRandomNonEqualVmgene(gene, dataCenterIterator);
-    // }
-
-    // int squirrelJump = 1; // Adjust the squirrel jump value based on the problem
-    // domain
-
-    // // Apply squirrel movement by adding/subtracting squirrelJump to the current
-    // // gene
-    // int newGene = gene + squirrelJump;
-    // if (newGene > maxGene) {
-    // newGene = maxGene;
-    // } else if (newGene < minGene) {
-    // newGene = minGene;
-    // }
-
-    // return newGene;
-    // }
 
     private double calculateMips(int vmIndex) {
         double mips = 0;
@@ -599,40 +763,6 @@ public void nomadImmigrate(Population population) {
             bestCloudletAllocation = new ArrayList<>(cloudletAllocation);
         }
     }
-
-    // public void updateGlobalBest(double fitness, List<Integer> vmPositions,
-    // List<Integer> cloudletAllocation) {
-    // if (fitness > globalBestFitness) {
-    // globalBestFitness = fitness;
-    // vmBestPositions = new ArrayList<>(vmPositions);
-    // bestCloudletAllocation = new ArrayList<>(cloudletAllocation);
-    // }
-    // }
-
-    // public void updatePosition(List<Integer> newvmPositions, List<Integer>
-    // newCloudletAllocation) {
-    // vmPositions = new ArrayList<>(newvmPositions);
-    // cloudletAllocation = new ArrayList<>(newCloudletAllocation);
-    // }
-
-    // public void updateVelocity(List<Integer> vmBestPositions, List<Integer>
-    // bestCloudletAllocation,
-    // double inertiaWeight, double cognitiveWeight, double socialWeight) {
-    // for (int i = 0; i < vmPositions.size(); i++) {
-    // int currentVm = vmPositions.get(i);
-    // int currentCloudlet = cloudletAllocation.get(i);
-    // int bestVm = vmBestPositions.get(i);
-    // int bestCloudlet = bestCloudletAllocation.get(i);
-
-    // double velocity = inertiaWeight * currentVm +
-    // cognitiveWeight * (bestVm - currentVm) * Math.random() +
-    // socialWeight * (bestCloudlet - currentCloudlet) * Math.random();
-
-    // vmPositions.set(i, (int) Math.round(currentVm + velocity));
-    // }
-
-    // updatePosition(vmPositions, cloudletAllocation);
-    // }
 
     public List<Integer> getvmBestPositions() {
         return vmBestPositions;
